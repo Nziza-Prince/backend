@@ -36,11 +36,15 @@ exports.getMessages = async (req, res) => {
             if (!sender || !receiver) {
                 return res.status(400).json({ error: 'Sender and receiver are required for direct messages' });
             }
+            if (userId !== sender && userId !== receiver) {
+                return res.status(403).json({ error: 'Unauthorized to view this conversation' });
+            }
             query = { sender, receiver, type: 'direct' };
         } else if (type === 'group') {
             if (!groupId) {
                 return res.status(400).json({ error: 'Group ID is required for group messages' });
             }
+            // Assume group membership check (requires Group model update)
             query = { groupId, type: 'group' };
         } else if (type === 'farm') {
             if (!farmId) {
@@ -52,7 +56,7 @@ exports.getMessages = async (req, res) => {
             }
             query = { farm: farmId, type: 'farm' };
         }
-        const messages = await Message.find(query).sort('timestamp');
+        const messages = await Message.find(query).sort('timestamp').populate('sender', 'username').populate('receiver', 'username');
         res.json(messages);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -67,9 +71,10 @@ exports.getMessagesForUser = async (req, res) => {
         const messages = await Message.find({
             $or: [
                 { receiver: userId, type: 'direct' },
+                { sender: userId, type: 'direct' }, // Include sent messages
                 { farm: { $in: farmIds }, type: 'farm' }
             ]
-        }).sort({ timestamp: -1 });
+        }).sort({ timestamp: -1 }).populate('sender', 'username').populate('receiver', 'username');
         res.json(messages);
     } catch (err) {
         res.status(500).json({ error: err.message });

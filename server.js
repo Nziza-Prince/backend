@@ -48,20 +48,25 @@ app.get('/auth/google/callback', passport.authenticate('google', { failureRedire
   res.redirect('/profile');
 });
 
-app.get('/profile', (req, res) => {
-  if (!req.isAuthenticated()) {
-    return res.redirect('/');
-  }
-  res.send(`Hello, ${req.user.username}`);
+//multer
+app.use((err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        return res.status(400).json({ error: err.message });
+    }
+    console.error(err.stack);
+    res.status(500).json({ error: 'Something went wrong!' });
 });
 
 app.get('/logout', (req, res, next) => {
-  req.logout((err) => {
-    if (err) return next(err);
-    res.redirect('/');
-  });
+    req.logout((err) => {
+        if (err) return next(err);
+        req.session.destroy((err) => {
+            if (err) return res.status(500).json({ error: 'Failed to destroy session' });
+            res.clearCookie('connect.sid'); // Clear session cookie
+            res.status(200).json({ message: 'Logged out successfully' });
+        });
+    });
 });
-
 // Routes
 app.use("/", routers);
 
@@ -72,7 +77,6 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => console.log('User disconnected:', socket.id));
 });
 
-
 connectDB();
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
