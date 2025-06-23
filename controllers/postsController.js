@@ -58,7 +58,15 @@ const updatePost = async (req, res) => {
         if (!post || !farm || farm.owner.toString() !== userId) {
             return res.status(403).json({ error: 'Unauthorized or post not found' });
         }
-        const updatedPost = await Post.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const { content, image } = req.body;
+        if (!content && !image) {
+            return res.status(400).json({ error: 'Content or image is required for update' });
+        }
+        const updatedPost = await Post.findByIdAndUpdate(
+            req.params.id,
+            { content, image, timestamp: Date.now() }, // Update timestamp on edit
+            { new: true }
+        ).populate('likes', 'username').populate('comments.user', 'username');
         res.json(updatedPost);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -74,7 +82,7 @@ const deletePost = async (req, res) => {
             return res.status(403).json({ error: 'Unauthorized or post not found' });
         }
         await Post.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Post deleted' });
+        res.json({ message: 'Post deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -100,22 +108,36 @@ const likePost = async (req, res) => {
         if (!post || !farm || farm.owner.toString() !== userId) {
             return res.status(403).json({ error: 'Unauthorized or post not found' });
         }
-        const updatedPost = await Post.findByIdAndUpdate(req.params.id, { $inc: { likes: 1 } }, { new: true });
+        if (post.likes.includes(userId)) {
+            return res.status(400).json({ error: 'You have already liked this post' });
+        }
+        const updatedPost = await Post.findByIdAndUpdate(
+            req.params.id,
+            { $push: { likes: userId } },
+            { new: true }
+        ).populate('likes', 'username');
         res.json(updatedPost);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };
-
 const commentPost = async (req, res) => {
     try {
         const post = await Post.findById(req.params.id);
         const userId = req.user.id;
+        const { content } = req.body;
         const farm = await Farm.findById(post.farm);
         if (!post || !farm || farm.owner.toString() !== userId) {
             return res.status(403).json({ error: 'Unauthorized or post not found' });
         }
-        const updatedPost = await Post.findByIdAndUpdate(req.params.id, { $inc: { comments: 1 } }, { new: true });
+        if (!content) {
+            return res.status(400).json({ error: 'Comment content is required' });
+        }
+        const updatedPost = await Post.findByIdAndUpdate(
+            req.params.id,
+            { $push: { comments: { user: userId, content } } },
+            { new: true }
+        ).populate('comments.user', 'username');
         res.json(updatedPost);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -136,5 +158,7 @@ const sharePost = async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 };
+
+
 
 module.exports = { createPost, getAllPosts, getPostById, updatePost, deletePost, deleteAllPosts, likePost, commentPost, sharePost };

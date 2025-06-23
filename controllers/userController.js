@@ -74,11 +74,30 @@ const searchUsers = async (req, res) => {
 
 const getAllUserIds = async (req, res) => {
     try {
-        const userIds = await User.find({}, '_id');
+        const userIds = await User.find({}, 'username');
         res.status(200).json(userIds);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };
 
-module.exports = { registerUser, loginUser, searchUsers, getAllUserIds };
+const getUserProfile = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        console.log('Fetching profile for userId:', userId); // Debug
+        const user = await User.findById(userId).select('username email farms').populate('farms', 'name location soilType');
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        if (!user.farms || user.farms.length === 0) {
+            console.log('No farms associated with user');
+        }
+        res.json(user);
+    } catch (err) {
+        console.error('Profile error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+
+module.exports = { registerUser, loginUser, searchUsers, getAllUserIds ,getUserProfile};
